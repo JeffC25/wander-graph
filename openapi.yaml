@@ -119,6 +119,43 @@ components:
       properties:
         error: { type: string }
 
+  responses:
+    BadRequest:
+      description: Invalid request body
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Missing or invalid JWT
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: Authenticated but not authorized
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: Resource already exists
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    TooManyRequests:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
 paths:
   # Auth
   /auth/register:
@@ -143,6 +180,9 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AuthTokens" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /auth/login:
     post:
       tags: [auth]
@@ -164,12 +204,17 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AuthTokens" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
 
   /auth/logout:
     post:
       tags: [auth]
       responses:
         "204": { description: Logged out }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
 
   /auth/refresh:
     post:
@@ -190,6 +235,9 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AuthTokens" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
 
   /auth/guest:
     post:
@@ -205,6 +253,8 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AuthTokens" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
 
   # Users
   /users/me:
@@ -216,6 +266,8 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
     patch:
       tags: [users]
       requestBody:
@@ -232,6 +284,9 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/User" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
 
   # Trips
   /trips:
@@ -245,6 +300,8 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/Trip" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
     post:
       tags: [trips]
       requestBody:
@@ -265,6 +322,9 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Trip" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
 
   /trips/{tripID}:
     parameters:
@@ -280,6 +340,10 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Trip" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
     patch:
       tags: [trips]
       requestBody:
@@ -298,10 +362,19 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Trip" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
     delete:
       tags: [trips]
       responses:
         "204": { description: Trip deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
 
   /trips/{tripID}/members:
     parameters:
@@ -319,6 +392,10 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/TripMember" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
 
   /trips/{tripID}/members/{userID}:
     parameters:
@@ -347,10 +424,19 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/TripMember" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
     delete:
       tags: [trips]
       responses:
         "204": { description: Member removed }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
 
   /trips/{tripID}/invites:
     parameters:
@@ -374,6 +460,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/TripInvite" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
 
   /trips/{tripID}/invites/{inviteID}:
     parameters:
@@ -389,6 +480,10 @@ paths:
       tags: [trips]
       responses:
         "204": { description: Invite deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
 
   /invites/{code}/join:
     parameters:
@@ -404,6 +499,10 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/TripMember" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
 
   # Destinations
   /trips/{tripID}/destinations:
@@ -422,6 +521,10 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/Destination" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
     post:
       tags: [destinations]
       requestBody:
@@ -442,6 +545,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Destination" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
 
   /trips/{tripID}/destinations/{destID}:
     parameters:
@@ -471,10 +579,19 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Destination" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
     delete:
       tags: [destinations]
       responses:
         "204": { description: Destination deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
 
   /trips/{tripID}/destinations/route:
     parameters:
@@ -490,6 +607,10 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/RouteResult" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
 
   # Itinerary
   /trips/{tripID}/destinations/{destID}/items:
@@ -512,6 +633,10 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/ItineraryItem" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
     post:
       tags: [itinerary]
       requestBody:
@@ -532,6 +657,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ItineraryItem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
 
   /trips/{tripID}/destinations/{destID}/items/{itemID}:
     parameters:
@@ -565,10 +695,19 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ItineraryItem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
     delete:
       tags: [itinerary]
       responses:
         "204": { description: Itinerary item deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
 
   /trips/{tripID}/destinations/{destID}/items/reorder:
     parameters:
@@ -595,7 +734,11 @@ paths:
                   items: { type: string, format: uuid }
       responses:
         "204": { description: Items reordered }
-
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   # Geocode
   /geocode/forward:
     post:
@@ -615,6 +758,9 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/GeocodeResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
 
   /geocode/reverse:
     post:
@@ -635,3 +781,6 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/GeocodeResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
