@@ -1,0 +1,637 @@
+openapi: 3.1.0
+info:
+  title: WanderGraph API
+  version: 0.1.0
+
+servers:
+  - url: http://localhost:8080
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email, nullable: true }
+        displayName: { type: string }
+        avatarUrl: { type: string, nullable: true }
+        isGuest: { type: boolean }
+        createdAt: { type: string, format: date-time }
+
+    Trip:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        notes: { type: string, nullable: true }
+        startDate: { type: string, format: date, nullable: true }
+        endDate: { type: string, format: date, nullable: true }
+        createdBy: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+
+    TripMember:
+      type: object
+      properties:
+        tripId: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        role: { type: string, enum: [owner, editor, viewer] }
+        joinedAt: { type: string, format: date-time }
+        user: { $ref: "#/components/schemas/User" }
+
+    TripInvite:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tripId: { type: string, format: uuid }
+        code: { type: string }
+        createdBy: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time, nullable: true }
+        maxUses: { type: integer, nullable: true }
+        useCount: { type: integer }
+
+    Destination:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tripId: { type: string, format: uuid }
+        name: { type: string }
+        notes: { type: string, nullable: true }
+        lat: { type: number }
+        long: { type: number }
+        position: { type: integer }
+        createdBy: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+
+    ItineraryItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        destinationId: { type: string, format: uuid }
+        title: { type: string }
+        notes: { type: string, nullable: true }
+        startsAt: { type: string, format: date-time, nullable: true }
+        endsAt: { type: string, format: date-time, nullable: true }
+        position: { type: integer }
+        createdBy: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+
+    RouteResult:
+      type: object
+      properties:
+        orderedIds:
+          type: array
+          items: { type: string, format: uuid }
+        legs:
+          type: array
+          items:
+            type: object
+            properties:
+              fromId: { type: string, format: uuid }
+              toId: { type: string, format: uuid }
+              cost: { type: number }
+        totalCost: { type: number }
+
+    GeocodeResult:
+      type: object
+      properties:
+        lat: { type: number }
+        long: { type: number }
+        name: { type: string }
+
+    AuthTokens:
+      type: object
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+
+paths:
+  # Auth
+  /auth/register:
+    post:
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, displayName]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+                displayName: { type: string }
+                guestToken: { type: string }
+      responses:
+        "201":
+          description: User registered
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthTokens" }
+  /auth/login:
+    post:
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthTokens" }
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      responses:
+        "204": { description: Logged out }
+
+  /auth/refresh:
+    post:
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        "200":
+          description: Tokens refreshed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthTokens" }
+
+  /auth/guest:
+    post:
+      tags: [auth]
+      security: []
+      parameters:
+        - in: query
+          name: seed
+          schema: { type: string, enum: [demo] }
+      responses:
+        "201":
+          description: Guest session created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthTokens" }
+
+  # Users
+  /users/me:
+    get:
+      tags: [users]
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+    patch:
+      tags: [users]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName: { type: string }
+                avatarUrl: { type: string }
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+
+  # Trips
+  /trips:
+    get:
+      tags: [trips]
+      responses:
+        "200":
+          description: List of trips for current user
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Trip" }
+    post:
+      tags: [trips]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                notes: { type: string }
+                startDate: { type: string, format: date }
+                endDate: { type: string, format: date }
+      responses:
+        "201":
+          description: Trip created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Trip" }
+
+  /trips/{tripID}:
+    parameters:
+      - in: path
+        name: tripID
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [trips]
+      responses:
+        "200":
+          description: Trip details
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Trip" }
+    patch:
+      tags: [trips]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                notes: { type: string }
+                startDate: { type: string, format: date }
+                endDate: { type: string, format: date }
+      responses:
+        "200":
+          description: Updated trip
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Trip" }
+    delete:
+      tags: [trips]
+      responses:
+        "204": { description: Trip deleted }
+
+  /trips/{tripID}/members:
+    parameters:
+      - in: path
+        name: tripID
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [trips]
+      responses:
+        "200":
+          description: List of trip members
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TripMember" }
+
+  /trips/{tripID}/members/{userID}:
+    parameters:
+      - in: path
+        name: tripID
+        required: true
+        schema: { type: string, format: uuid }
+      - in: path
+        name: userID
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      tags: [trips]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { type: string, enum: [editor, viewer] }
+      responses:
+        "200":
+          description: Updated member role
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TripMember" }
+    delete:
+      tags: [trips]
+      responses:
+        "204": { description: Member removed }
+
+  /trips/{tripID}/invites:
+    parameters:
+      - in: path
+        name: tripID
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [trips]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expiresAt: { type: string, format: date-time }
+                maxUses: { type: integer }
+      responses:
+        "201":
+          description: Invite created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TripInvite" }
+
+  /trips/{tripID}/invites/{inviteID}:
+    parameters:
+      - in: path
+        name: tripID
+        required: true
+        schema: { type: string, format: uuid }
+      - in: path
+        name: inviteID
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      tags: [trips]
+      responses:
+        "204": { description: Invite deleted }
+
+  /invites/{code}/join:
+    parameters:
+      - in: path
+        name: code
+        required: true
+        schema: { type: string }
+    post:
+      tags: [trips]
+      responses:
+        "200":
+          description: Joined trip
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TripMember" }
+
+  # Destinations
+  /trips/{tripID}/destinations:
+    parameters:
+      - in: path
+        name: tripID
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [destinations]
+      responses:
+        "200":
+          description: List of destinations
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Destination" }
+    post:
+      tags: [destinations]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, lat, long]
+              properties:
+                name: { type: string }
+                notes: { type: string }
+                lat: { type: number }
+                long: { type: number }
+      responses:
+        "201":
+          description: Destination created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Destination" }
+
+  /trips/{tripID}/destinations/{destID}:
+    parameters:
+      - in: path
+        name: tripID
+        required: true
+        schema: { type: string, format: uuid }
+      - in: path
+        name: destID
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      tags: [destinations]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                notes: { type: string }
+                lat: { type: number }
+                long: { type: number }
+      responses:
+        "200":
+          description: Updated destination
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Destination" }
+    delete:
+      tags: [destinations]
+      responses:
+        "204": { description: Destination deleted }
+
+  /trips/{tripID}/destinations/route:
+    parameters:
+      - in: path
+        name: tripID
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [destinations]
+      responses:
+        "200":
+          description: Optimal route through destinations
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RouteResult" }
+
+  # Itinerary
+  /trips/{tripID}/destinations/{destID}/items:
+    parameters:
+      - in: path
+        name: tripID
+        required: true
+        schema: { type: string, format: uuid }
+      - in: path
+        name: destID
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [itinerary]
+      responses:
+        "200":
+          description: List of itinerary items for destination
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ItineraryItem" }
+    post:
+      tags: [itinerary]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string }
+                notes: { type: string }
+                startsAt: { type: string, format: date-time }
+                endsAt: { type: string, format: date-time }
+      responses:
+        "201":
+          description: Itinerary item created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ItineraryItem" }
+
+  /trips/{tripID}/destinations/{destID}/items/{itemID}:
+    parameters:
+      - in: path
+        name: tripID
+        required: true
+        schema: { type: string, format: uuid }
+      - in: path
+        name: destID
+        required: true
+        schema: { type: string, format: uuid }
+      - in: path
+        name: itemID
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      tags: [itinerary]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                notes: { type: string }
+                startsAt: { type: string, format: date-time }
+                endsAt: { type: string, format: date-time }
+      responses:
+        "200":
+          description: Updated itinerary item
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ItineraryItem" }
+    delete:
+      tags: [itinerary]
+      responses:
+        "204": { description: Itinerary item deleted }
+
+  /trips/{tripID}/destinations/{destID}/items/reorder:
+    parameters:
+      - in: path
+        name: tripID
+        required: true
+        schema: { type: string, format: uuid }
+      - in: path
+        name: destID
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [itinerary]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [itemIDs]
+              properties:
+                itemIDs:
+                  type: array
+                  items: { type: string, format: uuid }
+      responses:
+        "204": { description: Items reordered }
+
+  # Geocode
+  /geocode/forward:
+    post:
+      tags: [geocode]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query: { type: string }
+      responses:
+        "200":
+          description: Geocode result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GeocodeResult" }
+
+  /geocode/reverse:
+    post:
+      tags: [geocode]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lat, long]
+              properties:
+                lat: { type: number }
+                long: { type: number }
+      responses:
+        "200":
+          description: Reverse geocode result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GeocodeResult" }
