@@ -69,6 +69,8 @@ components:
         lat: { type: number }
         long: { type: number }
         position: { type: integer }
+        startsAt: { type: string, format: date-time, nullable: true }
+        endsAt: { type: string, format: date-time, nullable: true }
         createdBy: { type: string, format: uuid }
         createdAt: { type: string, format: date-time }
 
@@ -539,6 +541,8 @@ paths:
                 notes: { type: string }
                 lat: { type: number }
                 long: { type: number }
+                startsAt: { type: string, format: date-time }
+                endsAt: { type: string, format: date-time }
       responses:
         "201":
           description: Destination created
@@ -573,6 +577,8 @@ paths:
                 notes: { type: string }
                 lat: { type: number }
                 long: { type: number }
+                startsAt: { type: string, format: date-time }
+                endsAt: { type: string, format: date-time }
       responses:
         "200":
           description: Updated destination
