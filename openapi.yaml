@@ -44,7 +44,9 @@ components:
       properties:
         id: { type: string, format: uuid }
         tripId: { type: string, format: uuid }
-        createdBy: { type: string, format: uuid }
+        role: { type: string, enum: [editor, viewer] }
+        status: { type: string, enum: [pending, accepted, rejected] }
+        resolvedBy: { type: string, format: uuid, nullable: true }
         createdAt: { type: string, format: date-time }
         resolvedAt: { type: string, format: date-time, nullable: true }
         user: { $ref: "#/components/schemas/User" }
@@ -66,8 +68,8 @@ components:
         createdBy: { type: string, format: uuid }
         maxUses: { type: integer, nullable: true }
         useCount: { type: integer }
-        createdAt: { type: string, format: date-time }
         expiresAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
 
     DirectedInvite:
       type: object
@@ -76,8 +78,8 @@ components:
         tripId: { type: string, format: uuid }
         userId: { type: string, format: uuid }
         createdBy: { type: string, format: uuid }
-        createdAt: { type: string, format: date-time }
         expiresAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
 
     Destination:
       type: object
@@ -114,7 +116,7 @@ components:
         tripId: { type: string, format: uuid }
         fromDestinationId: { type: string, format: uuid }
         toDestinationId: { type: string, format: uuid }
-        name: { type: string, nullable: true }
+        name: { type: string }
         notes: { type: string, nullable: true }
         distance: { type: number, nullable: true }
         cost: { type: number, nullable: true }
@@ -135,7 +137,7 @@ components:
           items:
             type: object
             properties:
-              fromDestinationIdId: { type: string, format: uuid }
+              fromDestinationId: { type: string, format: uuid }
               toDestinationId: { type: string, format: uuid }
               distance: { type: number }
 
@@ -249,8 +251,18 @@ paths:
   /auth/logout:
     post:
       tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
       responses:
         "204": { description: Logged out }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
@@ -373,6 +385,9 @@ paths:
         schema: { type: string, format: uuid }
     get:
       tags: [trips]
+      security:
+        - bearerAuth: []
+        - {}
       responses:
         "200":
           description: Trip details
@@ -424,6 +439,9 @@ paths:
         schema: { type: string, format: uuid }
     get:
       tags: [trips]
+      security:
+        - bearerAuth: []
+        - {}
       responses:
         "200":
           description: List of trip members
@@ -489,7 +507,7 @@ paths:
       summary: List all code invites for a trip
       responses:
         "200":
-          description: List of code invite
+          description: List of code invites
           content:
             application/json:
               schema:
@@ -512,7 +530,7 @@ paths:
                 expiresAt: { type: string, format: date-time }
       responses:
         "201":
-          description: Invite created
+          description: Code invite created
           content:
             application/json:
               schema: { $ref: "#/components/schemas/CodeInvite" }
@@ -572,12 +590,12 @@ paths:
       summary: List all directed invites for a trip
       responses:
         "200":
-          description: List of directed invite
+          description: List of directed invites
           content:
             application/json:
               schema:
                 type: array
-                items: { $ref: "#/components/schemas/CodeInvite" }
+                items: { $ref: "#/components/schemas/DirectedInvite" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -597,14 +615,137 @@ paths:
                 expiresAt: { type: string, format: date-time }
       responses:
         "201":
-          description: Directed invited created
+          description: Directed invite created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DirectedInvite" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /trips/{tripID}/invites/direct/{inviteID}:
+    parameters:
+      - in: path
+        name: tripID
+        required: true
+        schema: { type: string, format: uuid }
+      - in: path
+        name: inviteID
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      tags: [trips]
+      responses:
+        "204": { description: Directed invite deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /invites/{inviteID}/accept:
+    parameters:
+      - in: path
+        name: inviteID
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [trips]
+      summary: Accept a directed invite
+      responses:
+        "200":
+          description: Joined trip
           content:
             application/json:
               schema: { $ref: "#/components/schemas/TripMember" }
+        "204": { description: Direct invite deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /trips/{tripID}/access-requests:
+    parameters:
+      - in: path
+        name: tripID
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [trips]
+      summary: Owner lists access requests (optionally filtered by status)
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [pending, accepted, rejected] }
+      responses:
+        "200":
+          description: List of access requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TripAccessRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    post:
+      tags: [trips]
+      summary: Logged-in user requests viewer or editor access
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role: { type: string, enum: [viewer, editor] }
+      responses:
+        "201":
+          description: Access request created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TripAccessRequest" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /trips/{tripID}/access-requests/{requestID}:
+    parameters:
+      - in: path
+        name: tripID
+        required: true
+        schema: { type: string, format: uuid }
+      - in: path
+        name: requestID
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      tags: [trips]
+      summary: Owner accepts or rejects an access request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [accepted, rejected] }
+      responses:
+        "200":
+          description: Updated access request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TripAccessRequest" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
   # Destinations
@@ -616,6 +757,9 @@ paths:
         schema: { type: string, format: uuid }
     get:
       tags: [destinations]
+      security:
+        - bearerAuth: []
+        - {}
       responses:
         "200":
           description: List of destinations
@@ -700,6 +844,38 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
+  /trips/{tripID}/destinations/reorder:
+    parameters:
+      - in: path
+        name: tripID
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [destinations]
+      summary: Save a new destination position ordering
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orderedIds]
+              properties:
+                orderedIds:
+                  type: array
+                  items: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Current route
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RouteResult" }
+        "204": { description: Destination deleted }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
   /trips/{tripID}/destinations/route:
     parameters:
       - in: path
@@ -720,7 +896,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
-  /trips/{tripID}/destinations/route/optimize:
+  /trips/{tripID}/routes/optimize:
     parameters:
       - in: path
         name: tripID
@@ -728,7 +904,7 @@ paths:
         schema: { type: string, format: uuid }
     get:
       tags: [destinations]
-      summary: Get current route in position order with per-leg costs
+      summary: Suggest optimal ordering for a subset of destinations
       responses:
         "200":
           description: Current route
@@ -739,6 +915,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalServerError" }
+
   # Itinerary
   /trips/{tripID}/destinations/{destID}/items:
     parameters:
