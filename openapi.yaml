@@ -44,7 +44,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         tripId: { type: string, format: uuid }
-        role: { type: string, enum: [editor, viewer] }
+        role: { type: string, enum: [viewer, editor] }
         status: { type: string, enum: [pending, accepted, rejected] }
         resolvedBy: { type: string, format: uuid, nullable: true }
         createdAt: { type: string, format: date-time }
@@ -660,7 +660,6 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/TripMember" }
-        "204": { description: Direct invite deleted }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -694,7 +693,7 @@ paths:
         "500": { $ref: "#/components/responses/InternalServerError" }
     post:
       tags: [trips]
-      summary: Logged-in user requests viewer or editor access
+      summary: Logged-in user requests viewer or editor access -- re-request allowed if previously rejected
       requestBody:
         content:
           application/json:
@@ -854,6 +853,7 @@ paths:
       tags: [destinations]
       summary: Save a new destination position ordering
       requestBody:
+        required: true
         content:
           application/json:
             schema:
@@ -864,33 +864,110 @@ paths:
                   type: array
                   items: { type: string, format: uuid }
       responses:
-        "200":
-          description: Current route
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/RouteResult" }
-        "204": { description: Destination deleted }
+        "204": { description: Order saved }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalServerError" }
 
-  /trips/{tripID}/destinations/route:
+  # Legs
+  /trips/{tripID}/legs:
     parameters:
       - in: path
         name: tripID
         required: true
         schema: { type: string, format: uuid }
     get:
-      tags: [destinations]
-      summary: Get current route in position order with per-leg costs
+      tags: [legs]
+      security:
+        - bearerAuth: []
+        - {}
+      summary: List all saved legs for a trip
       responses:
         "200":
-          description: Current route
+          description: List of legs
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/RouteResult" }
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Leg" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    post:
+      tags: [legs]
+      summary: Create one or more legs between destinations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: object
+                required: [fromDestinationId, toDestinationId]
+                properties:
+                  fromDestinationId: { type: string, format: uuid }
+                  toDestinationId: { type: string, format: uuid }
+                  name: { type: string }
+                  notes: { type: string }
+                  distance: { type: number }
+                  cost: { type: number }
+      responses:
+        "201":
+          description: Legs created
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Leg" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+
+  /trips/{tripID}/legs/{legID}:
+    parameters:
+      - in: path
+        name: tripID
+        required: true
+        schema: { type: string, format: uuid }
+      - in: path
+        name: legID
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      tags: [legs]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                notes: { type: string }
+                distance: { type: number }
+                cost: { type: number }
+      responses:
+        "200":
+          description: Updated leg
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Leg" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    delete:
+      tags: [legs]
+      responses:
+        "204": { description: Leg deleted }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -902,15 +979,27 @@ paths:
         name: tripID
         required: true
         schema: { type: string, format: uuid }
-    get:
-      tags: [destinations]
-      summary: Suggest optimal ordering for a subset of destinations
+    post:
+      tags: [routes]
+      summary: Suggest optimal ordering for a subset of destinations -- does not save
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [destinationIds]
+              properties:
+                destinationIds:
+                  type: array
+                  items: { type: string, format: uuid }
       responses:
         "200":
-          description: Current route
+          description: Suggested route ordering
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/RouteResult" }
+              schema: { $ref: "#/components/schemas/OptimizeResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -929,6 +1018,9 @@ paths:
         schema: { type: string, format: uuid }
     get:
       tags: [itinerary]
+      security:
+        - bearerAuth: []
+        - {}
       responses:
         "200":
           description: List of itinerary items for destination
@@ -1031,9 +1123,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [itemIDs]
+              required: [orderedIds]
               properties:
-                itemIDs:
+                orderedIds:
                   type: array
                   items: { type: string, format: uuid }
       responses:
@@ -1043,6 +1135,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalServerError" }
+
   # Geocode
   /geocode/forward:
     post:
