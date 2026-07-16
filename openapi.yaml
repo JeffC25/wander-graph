@@ -693,7 +693,7 @@ paths:
         "500": { $ref: "#/components/responses/InternalServerError" }
     post:
       tags: [trips]
-      summary: Logged-in user requests viewer or editor access -- re-request allowed if previously rejected
+      summary: Logged-in user requests viewer or editor access - re-request allowed if previously rejected
       requestBody:
         content:
           application/json:
@@ -943,7 +943,6 @@ paths:
     patch:
       tags: [legs]
       requestBody:
-        required: true
         content:
           application/json:
             schema:
@@ -981,7 +980,7 @@ paths:
         schema: { type: string, format: uuid }
     post:
       tags: [routes]
-      summary: Suggest optimal ordering for a subset of destinations -- does not save
+      summary: Suggest optimal ordering for a subset of destinations - does not save
       requestBody:
         required: true
         content:
