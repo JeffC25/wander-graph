@@ -1,4 +1,5 @@
 -- +goose Up
+
 -- Users & Auth
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -6,7 +7,7 @@ CREATE TABLE users (
     password_hash TEXT,
     display_name TEXT NOT NULL,
     avatar_url TEXT,
-    is_guest BOOLEAN NOT NULL DEFAULT FALSE,
+    is_guest BOOLEAN NOT NULL DEFAULT false,
     guest_expires_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -22,38 +23,67 @@ CREATE TABLE refresh_tokens (
 -- Trips
 CREATE TABLE trips (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name TEST NOT NULL,
+    name TEXT NOT NULL,
     notes TEXT,
-    start_date date,
+    visibility TEXT NOT NULL DEFAULT 'private', -- private | public
+    start_date DATE,
+    end_date DATE,
+    created_by UUID NOT NULL REFERENCES users(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE trip_members (
     trip_id UUID NOT NULL REFERENCES trips (id) ON DELETE CASCADE,
-    user_id UUID NOT NULL REFERENCES trips (id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
     role TEXT NOT NULL DEFAULT 'editor', -- owner | editor | viewer
     joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (trip_id, user_id)
 );
 
-CREATE TABLE trip_invites (
+CREATE TABLE trip_code_invites (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     trip_id UUID NOT NULL REFERENCES trips (id) ON DELETE CASCADE,
     code TEXT NOT NULL UNIQUE,
     created_by UUID NOT NULL REFERENCES users (id),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    expires_at TIMESTAMPTZ,
+    role TEXT NOT NULL DEFAULT 'viewer', -- viewer | editor
     max_uses INT,
-    use_count INT NOT NULL DEFAULT 0
+    use_count INT NOT NULL DEFAULT 0,
+    expires_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE trip_direct_invites (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    trip_id UUID NOT NULL REFERENCES trips (id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    created_by UUID NOT NULL REFERENCES users (id),
+    role TEXT NOT NULL DEFAULT 'viewer', -- viewer | editor
+    expires_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (trip_id, user_id)
+);
+
+CREATE TABLE trip_access_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    trip_id UUID NOT NULL REFERENCES trips (id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    role TEXT NOT NULL DEFAULT 'editor', -- viewer | editor
+    status TEXT NOT NULL DEFAULT 'pending', -- pending | accepted | rejected
+    resolved_by UUID REFERENCES users (id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    resolved_at TIMESTAMPTZ,
+    UNIQUE (trip_id, user_id)
 );
 
 -- Destinations
 CREATE TABLE destinations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    destination_id UUID NOT NULL REFERENCES destinations (id) ON DELETE CASCADE,
-    title TEXT NOT NULL,
+    trip_id UUID NOT NULL REFERENCES trips (id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
     notes TEXT,
     lat NUMERIC(9, 6),
     long NUMERIC(9, 6),
+    position INT NOT NULL,
     starts_at TIMESTAMPTZ,
     ends_at TIMESTAMPTZ,
     created_by UUID NOT NULL REFERENCES users (id),
@@ -66,36 +96,59 @@ CREATE TABLE itinerary_items (
     destination_id UUID NOT NULL REFERENCES destinations (id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     notes TEXT,
-    lat NUMERIC(9, 6) NOT NULL,
-    long NUMERIC(9, 6) NOT NULL,
     starts_at TIMESTAMPTZ,
     ends_at TIMESTAMPTZ,
+    position INT NOT NULL,
     created_by UUID NOT NULL REFERENCES users (id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Geocode cache
+-- Legs
+CREATE TABLE legs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    trip_id UUID NOT NULL REFERENCES trips (id) ON DELETE CASCADE,
+    from_destination_id UUID NOT NULL REFERENCES destinations (id) ON DELETE CASCADE,
+    to_destination_id UUID NOT NULL REFERENCES destinations (id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    notes TEXT,
+    distance NUMERIC(10,2),
+    cost NUMERIC(10,2),
+    created_by UUID NOT NULL REFERENCES users (id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (trip_id, from_destination_id, to_destination_id),
+    CHECK (from_destination_id <> to_destination_id)
+);
+
+-- Geocode Cache
 CREATE TABLE geocode_cache (
     query TEXT PRIMARY KEY,
-    lat NUMERIC(9, 6),
-    long NUMERIC(9, 6),
-    name TEST NOT NULL,
-    cahced_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    lat NUMERIC(9, 6) NOT NULL,
+    long NUMERIC(9, 6) NOT NULL,
+    name TEXT NOT NULL,
+    cached_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- Indexes
-create index on trip_members (user_id);
-create index on destinations (trip_id;
-create index on itinerary_items (destination_id);
-create index on refresh_tokens (user_id);
-create index on users (is_guest, guest_expres_at) where is_guest = true;
+CREATE INDEX ON trip_access_requests (trip_id);
+CREATE INDEX ON trip_direct_invites (trip_id);
+CREATE INDEX ON trip_direct_invites (user_id);
+CREATE INDEX ON trip_code_invites (trip_id);
+CREATE INDEX ON legs (trip_id);
+CREATE INDEX ON trip_members (user_id);
+CREATE INDEX ON destinations (trip_id);
+CREATE INDEX ON itinerary_items (destination_id);
+CREATE INDEX ON refresh_tokens (user_id);
+CREATE INDEX ON users (is_guest, guest_expires_at) WHERE is_guest = true;
 
 -- +goose Down
-drop table if exists geocode_cache;
-drop table if exists itinerary_items;
-drop table if exists destinations;
-drop table if exists trip_invites;
-drop table if exists trip_members;
-drop table if exists trips;
-drop table if exists refresh_tokens;
-drop table if exists users;
+DROP TABLE IF EXISTS trip_access_requests;
+DROP TABLE IF EXISTS trip_direct_invites;
+DROP TABLE IF EXISTS trip_code_invites;
+DROP TABLE IF EXISTS legs;
+DROP TABLE IF EXISTS geocode_cache;
+DROP TABLE IF EXISTS itinerary_items;
+DROP TABLE IF EXISTS destinations;
+DROP TABLE IF EXISTS trip_members;
+DROP TABLE IF EXISTS trips;
+DROP TABLE IF EXISTS refresh_tokens;
+DROP TABLE IF EXISTS users;
