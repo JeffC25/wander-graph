@@ -66,6 +66,7 @@ components:
         tripId: { type: string, format: uuid }
         code: { type: string }
         createdBy: { type: string, format: uuid }
+        role: { type: string, enum: [viewer, editor] }
         maxUses: { type: integer, nullable: true }
         useCount: { type: integer }
         expiresAt: { type: string, format: date-time, nullable: true }
@@ -78,6 +79,7 @@ components:
         tripId: { type: string, format: uuid }
         userId: { type: string, format: uuid }
         createdBy: { type: string, format: uuid }
+        role: { type: string, enum: [viewer, editor] }
         expiresAt: { type: string, format: date-time, nullable: true }
         createdAt: { type: string, format: date-time }
 
@@ -526,6 +528,7 @@ paths:
             schema:
               type: object
               properties:
+                role: { type: string, enum: [viewer, editor] }
                 maxUses: { type: integer }
                 expiresAt: { type: string, format: date-time }
       responses:
@@ -612,6 +615,7 @@ paths:
               required: [email]
               properties:
                 email: { type: string, format: email }
+                role: { type: string, enum: [viewer, editor] }
                 expiresAt: { type: string, format: date-time }
       responses:
         "201":
