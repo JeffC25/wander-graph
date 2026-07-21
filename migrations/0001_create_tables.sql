@@ -1,5 +1,4 @@
 -- +goose Up
-
 -- Users & Auth
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -7,7 +6,7 @@ CREATE TABLE users (
     password_hash TEXT,
     display_name TEXT NOT NULL,
     avatar_url TEXT,
-    is_guest BOOLEAN NOT NULL DEFAULT false,
+    is_guest BOOLEAN NOT NULL DEFAULT FALSE,
     guest_expires_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -28,7 +27,7 @@ CREATE TABLE trips (
     visibility TEXT NOT NULL DEFAULT 'private', -- private | public
     start_date DATE,
     end_date DATE,
-    created_by UUID NOT NULL REFERENCES users(id),
+    created_by UUID NOT NULL REFERENCES users (id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -111,8 +110,8 @@ CREATE TABLE legs (
     to_destination_id UUID NOT NULL REFERENCES destinations (id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     notes TEXT,
-    distance NUMERIC(10,2),
-    cost NUMERIC(10,2),
+    distance NUMERIC(10, 2),
+    cost NUMERIC(10, 2),
     created_by UUID NOT NULL REFERENCES users (id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (trip_id, from_destination_id, to_destination_id),
@@ -130,25 +129,46 @@ CREATE TABLE geocode_cache (
 
 -- Indexes
 CREATE INDEX ON trip_access_requests (trip_id);
+
 CREATE INDEX ON trip_direct_invites (trip_id);
+
 CREATE INDEX ON trip_direct_invites (user_id);
+
 CREATE INDEX ON trip_code_invites (trip_id);
+
 CREATE INDEX ON legs (trip_id);
+
 CREATE INDEX ON trip_members (user_id);
+
 CREATE INDEX ON destinations (trip_id);
+
 CREATE INDEX ON itinerary_items (destination_id);
+
 CREATE INDEX ON refresh_tokens (user_id);
-CREATE INDEX ON users (is_guest, guest_expires_at) WHERE is_guest = true;
+
+CREATE INDEX ON users (is_guest, guest_expires_at)
+WHERE
+    is_guest = TRUE;
 
 -- +goose Down
 DROP TABLE IF EXISTS trip_access_requests;
+
 DROP TABLE IF EXISTS trip_direct_invites;
+
 DROP TABLE IF EXISTS trip_code_invites;
+
 DROP TABLE IF EXISTS legs;
+
 DROP TABLE IF EXISTS geocode_cache;
+
 DROP TABLE IF EXISTS itinerary_items;
+
 DROP TABLE IF EXISTS destinations;
+
 DROP TABLE IF EXISTS trip_members;
+
 DROP TABLE IF EXISTS trips;
+
 DROP TABLE IF EXISTS refresh_tokens;
+
 DROP TABLE IF EXISTS users;
